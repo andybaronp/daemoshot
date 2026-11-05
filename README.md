@@ -1,6 +1,6 @@
 # Daemoshot (v15.0.0-custom)
 
-**Daemoshot** es una versión personalizada y extendida de captura de pantalla y anotación explicativa en tiempo real para Windows (x86_64), creada a partir del análisis de ingeniería inversa con **REA (`rea-agents`) + Ghidra** y el código fuente abierto de **[Flameshot](https://github.com/flameshot-org/flameshot)**.
+**Daemoshot** es una versión personalizada y extendida de captura de pantalla, anotación explicativa en tiempo real y grabación de video para Windows (x86_64), creada a partir del análisis de ingeniería inversa con **REA (`rea-agents`) + Ghidra** y el código fuente abierto de **[Flameshot](https://github.com/flameshot-org/flameshot)**.
 
 ---
 
@@ -19,7 +19,7 @@ Este proyecto está basado en **[Flameshot](https://github.com/flameshot-org/fla
 Utilizando el servidor MCP de **REA (`rea-agents@6.8.0`)** junto con **Ghidra 12.1.4** en **Antigravity**:
 
 1. **Inspección de Aplicación de Escritorio y Binario PE (`inspect_desktop_application`, `inspect_pe_imports`, `inspect_pe_resources`)**:
-   - Se verificó la arquitectura `PE32+ (amd64)` del ejecutable original `flameshot.exe` (`SHA-256: 40a9bb0c006fe47f7a79dd1a3f6e8f956b89a4632cbf0adfc99b069cefb198cb`), compilado con MSVC y enlazado dinámicamente contra **Qt 6.9.3** (`Qt6Core.dll`, `Qt6Gui.dll`, `Qt6Widgets.dll`, `Qt6Network.dll`, `Qt6Svg.dll`).
+   - Se verificó la arquitectura `PE32+ (amd64)` del ejecutable original `flameshot.exe`, compilado con MSVC y enlazado dinámicamente contra **Qt 6.9.3** (`Qt6Core.dll`, `Qt6Gui.dll`, `Qt6Widgets.dll`, `Qt6Network.dll`, `Qt6Svg.dll`).
 2. **Identificación del cambio de comportamiento en v14.0+ (Selector de Monitor Obligatorio)**:
    - Se localizaron los símbolos y rutinas `ScreenGrabber::grabEntireDesktop`, `ScreenGrabber::selectMonitorAndCrop` y `MonitorPreview`.
    - En Flameshot v14.0, al invocar una captura gráfica (`gui`), `ScreenGrabber::grabEntireDesktop` capturaba el escritorio completo pero llamaba de forma obligatoria a `selectMonitorAndCrop(screenshot, ok)`, abriendo una ventana previa (`MonitorPreview`) que obligaba al usuario a elegir primero un monitor y recortaba la captura a una sola pantalla antes de mostrar `CaptureWidget`.
@@ -53,7 +53,7 @@ Se añadieron capacidades completas de anotación explicativa estilo *presentado
   - **🗑️ `Limpiar trazos (X)`**: Borra todos los trazos dibujados con una sola tecla.
   - **🖥️ `Dibujar en Pantalla Viva (Ctrl+D)`**: Cambia directamente al modo de anotación transparente sobre el escritorio en vivo.
 
-#### B. Modo de Dibujo en Pantalla Viva (`ScreenDrawWidget` — `Alt+Shift+D`)
+#### B. Modo de Dibujo en Pantalla Viva (`ScreenDrawWidget` — `Alt+Shift+D` o Menú de Bandeja)
 - Implementado en [`src/widgets/screendrawwidget.h`](flameshot/src/widgets/screendrawwidget.h) y [`src/widgets/screendrawwidget.cpp`](flameshot/src/widgets/screendrawwidget.cpp).
 - Superpone un lienzo transparente multimonitor siempre visible sobre tus aplicaciones en ejecución.
 - Incluye barra flotante interactiva con:
@@ -62,38 +62,43 @@ Se añadieron capacidades completas de anotación explicativa estilo *presentado
   - Conmutador **🖍️ `Glow ON/OFF (H)`**.
   - Paleta rápida de 7 colores neón, ajuste de grosor con la rueda del ratón, **Deshacer (`Ctrl+Z`)**, **Limpiar (`X`)** y **Salir (`Esc`)**.
 
-### 3. Identidad Propia (`Daemoshot`), Icono Personalizado e Inicio Automático con Windows
+### 3. Grabación de Video y Pizarra en Vivo (H.265 / HEVC o GIF) con Modo de Interacción de Escritorio
+Se integró directamente en el menú flotante de la pizarra (`ScreenDrawWidget`) la capacidad de grabar en tiempo real e interactuar con el PC:
+
+- **Modo Usar PC / Interacción de Escritorio (`🖱️ Usando PC (Tab)` / `✏️ Dibujando (Tab)`)**:
+  - Resuelve la necesidad de usar programas, hacer clics en ventanas, navegar por internet o escribir texto **mientras se graba la pantalla o mientras la pizarra está abierta**.
+  - Al activar este modo (mediante el botón en la barra o presionando la tecla **`Tab`**), la pizarra entra en modo *Mouse Passthrough* (`WM_NCHITTEST -> HTTRANSPARENT`). Todos los clics y movimientos del ratón pasan directamente a las aplicaciones de Windows.
+  - La barra flotante permanece activa y clickeable para pausar, cambiar de herramienta, volver al modo dibujo o detener la grabación en cualquier momento.
+  - Al seleccionar cualquier herramienta de dibujo (`P`, `L`, `M`, `A`, `D`, `R`, `C`), se reactiva automáticamente el modo pizarra para dibujar de inmediato.
+- **Formatos soportados con un clic**:
+  - **`🎬 H.265 (MP4)`**: Video de ultra alta compresión utilizando el códec moderno HEVC / H.265 (`libx265`, `-preset ultrafast`, tag `hvc1`), totalmente compatible con el reproductor nativo de Windows y navegadores modernos.
+  - **`🎞️ GIF`**: Grabación en formato GIF animado mediante cuantización y dithering de paleta optimizada en FFmpeg, y con respaldo nativo mediante motor integrado en código fuente (`src/utils/gif.h`) para funcionar de forma autónoma sin depender de ejecutables externos.
+- **Controles en la barra de herramientas de la pizarra**:
+  - Botón selector de interacción: **`✏️ Dibujando (Tab)`** / **`🖱️ Usando PC (Tab)`**.
+  - Botón selector de formato: **`🎬 H.265 (MP4)`** / **`🎞️ GIF`**.
+  - Botón de grabación en tiempo real con cronómetro: **`🔴 REC (V)`** / **`⏹ REC [mm:ss] (V)`** con estilo visual distintivo en rojo.
+  - Atajo de teclado: Tecla **`V`** para alternar iniciar / detener grabación inmediatamente sin levantar el cursor.
+- **Captura enriquecida**:
+  - Graba a 15 FPS la pantalla actual junto con todos los trazos explicativos en vivo, trazos que se desvanecen, puntero láser, cursor del ratón con indicador luminoso y badge superior de grabación.
+- **Finalización y acceso directo**:
+  - Guarda automáticamente los videos en la carpeta `Videos/Daemoshot_Recordings` con marca de tiempo única.
+  - Al detener la grabación, muestra un diálogo resumen con opciones de un solo clic para **`▶ Reproducir / Abrir`** o **`📁 Abrir Carpeta`**.
+
+### 4. Identidad Propia (`Daemoshot`), Icono Personalizado e Inicio Automático con Windows
 - Se integró el icono personalizado [`ico.png`](ico.png) convirtiéndolo en un recurso `.ico` multirresolución de 32 bits (`16×16`, `32×32`, `48×48`, `64×64`, `128×128`, `256×256`) incrustado en `daemoshot.exe` y en el sistema de recursos de Qt (`graphics.qrc`).
 - Se habilitó por defecto el **inicio automático con Windows** (`startupLaunch = true`), registrando automáticamente `Daemoshot` en `HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Run`.
 
 ---
 
-## ⌨️ Atajos Rápidos Principales
+## 📦 Instalador Autónomo para Windows (`Daemoshot-Setup.exe`)
 
-| Atajo | Acción |
-| :--- | :--- |
-| **`PrtSc`** (o `Meta+Shift+X`) | Iniciar captura directa en todos los monitores |
-| **`Alt+Shift+D`** | Abrir/Cerrar **Modo Dibujo Explicativo en Pantalla Viva** |
-| **`Ctrl+D`** *(en captura)* | Pasar de la captura al **Modo Dibujo en Pantalla Viva** |
-| **`F`** | Alternar entre **⏳ Se desvanece** y **📌 Se mantiene** |
-| **`H`** | Activar/Desactivar **🖍️ Efecto Resaltador (Glow)** en cualquier herramienta |
-| **`L`** | Seleccionar herramienta **✨ Puntero/Trazo Láser** |
-| **`P` / `M` / `A` / `D` / `R` / `C`** | Lápiz (`P`), Resaltador (`M`), Flecha (`A`), Línea (`D`), Rectángulo (`R`), Círculo (`C`) |
-| **`X`** | Limpiar todos los trazos dibujados |
-| **`Rueda del ratón`** | Cambiar grosor de la herramienta activa |
-| **`Ctrl+Z`** | Deshacer último trazo |
-| **`Esc`** | Salir de la captura o del modo dibujo en pantalla |
+Se generó un instalador autónomo ejecutable para Windows:
 
----
-
-## 📦 Instalación y Uso
-
-### Opción 1: Usar el Instalador (`Daemoshot-Setup.exe`)
-Ejecuta **`Daemoshot-Setup.exe`**:
-1. Instala **Daemoshot** en `%LOCALAPPDATA%\Programs\Daemoshot`.
-2. Crea accesos directos en el **Escritorio** y en el **Menú Inicio** con el icono oficial de Daemoshot.
-3. Configura el **inicio automático al arrancar Windows** (`HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\Daemoshot`).
-4. Registra el desinstalador en *Aplicaciones instaladas* de Windows y deja **Daemoshot** ejecutándose en la bandeja del sistema.
-
-### Opción 2: Ejecución Directa Portable (`daemoshot/`)
-También puedes ejecutar directamente [`daemoshot/daemoshot.exe`](daemoshot/daemoshot.exe). Al iniciarse por primera vez, queda residente en la bandeja del sistema y se registra para iniciar con Windows.
+- **Ruta del Instalador**: [`Daemoshot-Setup.exe`](Daemoshot-Setup.exe) (ubicado en la raíz de este directorio).
+- **Características del Instalador**:
+  - Interfaz gráfica moderna con icono oficial de Daemoshot y barra de progreso.
+  - Instala en `%LocalAppData%\Programs\Daemoshot` (no requiere privilegios elevados de Administrador).
+  - Crea accesos directos en el **Menú Inicio** y en el **Escritorio**.
+  - Configura automáticamente el inicio al encender Windows (`HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run`).
+  - Soporta instalación desatendida mediante el flag `--silent`.
+  - Inicia inmediatamente Daemoshot en segundo plano tras la instalación.
